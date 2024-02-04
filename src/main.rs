@@ -1,19 +1,20 @@
-use std::fmt::Debug;
-
 struct Board {
     color_count: u32,
     hole_count: u32,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 struct MatchKeys {
     exact_count: u32,
     color_count: u32,
 }
 
-impl Debug for MatchKeys {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{}", self.exact_count, self.color_count)
+impl MatchKeys {
+    fn new(exact_count: u32, color_count: u32) -> MatchKeys {
+        MatchKeys {
+            exact_count,
+            color_count,
+        }
     }
 }
 
@@ -31,7 +32,6 @@ impl Board {
         let mut pattern = pattern;
         let mut guess = guess;
         let mut exact_count = 0;
-        // TODO - Encode in u32 instead of Vec
         let mut pattern_colors = vec![0; self.color_count as usize];
         let mut guess_colors = vec![0; self.color_count as usize];
         for _ in 0..self.hole_count {
@@ -71,33 +71,134 @@ impl Board {
     }
 }
 
-fn main() {
-    const COLOR_CHARS: &[char] = &['A', 'B', 'C'];
-    let board = Board::new(COLOR_CHARS.len() as u32, 2);
+struct Game {
+    board: Board,
+    matches: Vec<Vec<MatchKeys>>,
+    pattern_list: Vec<u32>,
+}
+
+fn compute_all_matches(board: &Board) -> Vec<Vec<MatchKeys>> {
     let pattern_count = board.total_pattern_count();
-    println!("Total pattern count: {}", pattern_count);
-    for pattern in 0..pattern_count {
-        let pattern_str = board.pattern_to_string(pattern, COLOR_CHARS);
-        println!("Pattern: {}", pattern_str);
+    (0..pattern_count)
+        .map(|pattern| {
+            (0..pattern_count)
+                .map(|guess| board.compute_match(pattern, guess))
+                .collect()
+        })
+        .collect()
+}
+
+impl Game {
+    fn new(color_count: u32, hole_count: u32) -> Game {
+        let board = Board::new(color_count, hole_count);
+        let matches = compute_all_matches(&board);
+        let pattern_list = (0..board.total_pattern_count()).collect();
+        Game {
+            board,
+            matches,
+            pattern_list,
+        }
     }
-    println!(
-        "Match of {} and {}: {:?}",
-        board.pattern_to_string(1, COLOR_CHARS),
-        board.pattern_to_string(3, COLOR_CHARS),
-        board.compute_match(1, 3)
-    );
+
+    fn get_guess(&self) -> (u32, u32) {
+        if self.pattern_list.len() == 1 {
+            return (self.pattern_list[0], 1);
+        }
+
+        let mut best: Option<(u32, u32, u32)> = None;
+
+        for &guess in &self.pattern_list {
+            let match_row = &self.matches[guess as usize];
+            let mut possibles: Vec<MatchKeys> = self
+                .pattern_list
+                .iter()
+                .map(|&pattern| match_row[pattern as usize])
+                .collect();
+            // Sort to group the same MatchKeys together
+            possibles.sort();
+
+            let mut row_max = 0;
+            let mut total_length: u32 = 0; // Sum of all group lengths
+            let mut tail = possibles.as_slice();
+            while !tail.is_empty() {
+                let key = tail[0];
+                let group_length = tail.iter().position(|&k| k != key).unwrap_or(tail.len());
+                row_max = row_max.max(group_length as u32);
+                total_length += (group_length as u32).pow(2);
+                tail = &tail[group_length..];
+            }
+
+            if let Some((best_row_max, best_total_length, _)) = best {
+                if row_max < best_row_max
+                    || (row_max == best_row_max && total_length < best_total_length)
+                {
+                    best = Some((row_max, total_length, guess));
+                }
+            } else {
+                best = Some((row_max, total_length, guess));
+            }
+        }
+
+        (best.unwrap().2, self.pattern_list.len() as u32)
+    }
+
+    fn apply_match(&mut self, guess: u32, match_keys: MatchKeys) {
+        let guess_row = &self.matches[guess as usize];
+        self.pattern_list = self
+            .pattern_list
+            .iter()
+            .filter(|&p| guess_row[*p as usize] == match_keys)
+            .copied()
+            .collect();
+    }
+}
+
+fn read_match_keys() -> MatchKeys {
+    println!("Enter exact count and color count separated by comma: ");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    let mut parts = input.trim().split(',');
+    let exact_count = parts.next().unwrap().parse().unwrap();
+    let color_count = parts.next().unwrap().parse().unwrap();
+    MatchKeys::new(exact_count, color_count)
+}
+
+fn main() {
+    let color_chars = vec!['P', 'R', 'G', 'Y', 'B'];
+    let hole_count = 4;
+    let mut game = Game::new(color_chars.len() as u32, hole_count);
+    loop {
+        let (guess, possibles) = game.get_guess();
+        if possibles == 1 {
+            println!(
+                "Answer: {}",
+                game.board.pattern_to_string(guess, &color_chars)
+            );
+            break;
+        } else {
+            println!(
+                "Guess: {} ({} possibles)",
+                game.board.pattern_to_string(guess, &color_chars),
+                possibles
+            );
+        }
+        let keys = read_match_keys();
+        if keys == MatchKeys::new(hole_count, 0) {
+            println!("Lucky guess!");
+            break;
+        }
+        game.apply_match(guess, keys);
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fmt::Debug;
 
-    impl MatchKeys {
-        fn new(exact_count: u32, color_count: u32) -> MatchKeys {
-            MatchKeys {
-                exact_count,
-                color_count,
-            }
+    impl Debug for MatchKeys {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{},{}", self.exact_count, self.color_count)
         }
     }
 

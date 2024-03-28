@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 struct Board {
     color_count: u32,
     hole_count: u32,
@@ -15,6 +17,12 @@ impl MatchKeys {
             exact_count,
             color_count,
         }
+    }
+}
+
+impl Display for MatchKeys {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{}", self.exact_count, self.color_count)
     }
 }
 
@@ -68,6 +76,11 @@ impl Board {
             .iter()
             .rev()
             .collect()
+    }
+    fn string_to_pattern(&self, s: &str, color_chars: &[char]) -> u32 {
+        s.chars()
+            .map(|c| color_chars.iter().position(|&x| x == c).unwrap() as u32)
+            .fold(0, |acc, x| acc * self.color_count + x)
     }
 }
 
@@ -163,9 +176,7 @@ fn read_match_keys() -> MatchKeys {
     MatchKeys::new(exact_count, color_count)
 }
 
-fn main() {
-    let color_chars = vec!['P', 'R', 'G', 'Y', 'B'];
-    let hole_count = 4;
+fn play_interactive(hole_count: u32, color_chars: &Vec<char>) {
     let mut game = Game::new(color_chars.len() as u32, hole_count);
     loop {
         let (guess, possibles) = game.get_guess();
@@ -188,6 +199,92 @@ fn main() {
             break;
         }
         game.apply_match(guess, keys);
+    }
+}
+
+fn play_auto(hole_count: u32, color_chars: &Vec<char>, code: &str) {
+    let mut game = Game::new(color_chars.len() as u32, hole_count);
+    let code = game.board.string_to_pattern(code, &color_chars);
+    loop {
+        let (guess, possibles) = game.get_guess();
+        if possibles == 1 {
+            println!(
+                "Answer: {}",
+                game.board.pattern_to_string(guess, &color_chars)
+            );
+            break;
+        } else {
+            println!(
+                "Guess: {} ({} possibles)",
+                game.board.pattern_to_string(guess, &color_chars),
+                possibles
+            );
+        }
+        let keys = game.board.compute_match(guess, code);
+        println!("Match: {}", keys);
+        if keys == MatchKeys::new(hole_count, 0) {
+            println!("Lucky guess!");
+            break;
+        }
+        game.apply_match(guess, keys);
+    }
+}
+
+fn count_guesses(hole_count: u32, color_chars: &Vec<char>, code: u32) -> u32 {
+    let mut game = Game::new(color_chars.len() as u32, hole_count);
+    let mut count = 0;
+    loop {
+        let (guess, possibles) = game.get_guess();
+        count += 1;
+        if possibles == 1 {
+            break;
+        }
+        let keys = game.board.compute_match(guess, code);
+        if keys == MatchKeys::new(hole_count, 0) {
+            break;
+        }
+        game.apply_match(guess, keys);
+    }
+    count
+}
+
+fn play_all_patterns(hole_count: u32, color_chars: &Vec<char>) {
+    let mut total_guesses = 0;
+    let mut max_guesses = 0;
+    let color_count = color_chars.len() as u32;
+    let total_patterns = color_count.pow(hole_count);
+    for code in 0..total_patterns {
+        let guesses = count_guesses(hole_count, color_chars, code);
+        max_guesses = max_guesses.max(guesses);
+        total_guesses += guesses;
+        println!(
+            "Code: {} Guesses: {}",
+            Board::new(color_count, hole_count).pattern_to_string(code, &color_chars),
+            guesses
+        );
+    }
+    println!("Max number of guesses: {}", max_guesses);
+    println!("Average guesses: {}", total_guesses as f64 / total_patterns as f64);
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.len() < 2 {
+        eprintln!("Usage: mastermind <hole count> <peg chars>");
+        std::process::exit(1);
+    }
+    let hole_count = u32::from_str_radix(&args[0], 10).expect("Invalid hole count");
+    let color_chars = args[1].chars().collect::<Vec<char>>();
+    if args.len() == 2 {
+        play_interactive(hole_count, &color_chars);
+    } else if args.len() == 3 && args[2] == "all" {
+        play_all_patterns(hole_count, &color_chars);
+    } else if args.len() == 4 && args[2] == "guess" {
+        let code = &args[3];
+        play_auto(hole_count, &color_chars, code);
+    } else {
+        eprintln!("Illegal usage");
+        std::process::exit(1);
     }
 }
 

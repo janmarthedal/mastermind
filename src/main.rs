@@ -235,10 +235,10 @@ fn count_guesses(hole_count: u32, color_chars: &Vec<char>, code: u32) -> u32 {
     let mut count = 0;
     loop {
         let (guess, possibles) = game.get_guess();
-        count += 1;
         if possibles == 1 {
             break;
         }
+        count += 1;
         let keys = game.board.compute_match(guess, code);
         if keys == MatchKeys::new(hole_count, 0) {
             break;

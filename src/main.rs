@@ -114,14 +114,25 @@ impl Game {
     }
 
     fn get_guess(&self) -> (u32, u32) {
-        if self.pattern_list.len() == 1 {
-            return (self.pattern_list[0], 1);
+        // `pattern_list` contains all possible patterns at this point
+
+        // If there is only one pattern left, we are done
+        // If there are two patterns left, we can just guess the first one
+        if self.pattern_list.len() <= 2 {
+            return (self.pattern_list[0], self.pattern_list.len() as u32);
         }
 
+        // The 3-tuple is
+        //   row_max: The current minimum of the maximum group length
+        //   total_length: The current minimum of the sum of all group lengths
+        //   guess: The pattern that minimizes the above two values
         let mut best: Option<(u32, u32, u32)> = None;
 
-        for &guess in &self.pattern_list {
+        // Consider *any* patterns as a potential guess
+        for guess in 0..self.matches.len() as u32 {
+            // Look up *all* `MatchKeys` for this guess
             let match_row = &self.matches[guess as usize];
+            // Consider only the `MatchKeys` for the remaining patterns
             let mut possibles: Vec<MatchKeys> = self
                 .pattern_list
                 .iter()
@@ -132,16 +143,18 @@ impl Game {
 
             let mut row_max = 0;
             let mut total_length: u32 = 0; // Sum of all group lengths
-            let mut tail = possibles.as_slice();
-            while !tail.is_empty() {
-                let key = tail[0];
-                let group_length = tail.iter().position(|&k| k != key).unwrap_or(tail.len());
+            let mut rest = possibles.as_slice();
+            while let Some(&key) = rest.first() {
+                // The group length is the index of the first element that is not equal to `key`
+                let group_length = rest.iter().position(|&k| k != key).unwrap_or(rest.len());
                 row_max = row_max.max(group_length as u32);
                 total_length += (group_length as u32).pow(2);
-                tail = &tail[group_length..];
+                rest = &rest[group_length..];
             }
 
             if let Some((best_row_max, best_total_length, _)) = best {
+                // Considering the `total_length` in case of a tie-breaker
+                // reduces the average number of guesses needed
                 if row_max < best_row_max
                     || (row_max == best_row_max && total_length < best_total_length)
                 {
@@ -234,11 +247,11 @@ fn count_guesses(hole_count: u32, color_chars: &Vec<char>, code: u32) -> u32 {
     let mut game = Game::new(color_chars.len() as u32, hole_count);
     let mut count = 0;
     loop {
+        count += 1;
         let (guess, possibles) = game.get_guess();
         if possibles == 1 {
             break;
         }
-        count += 1;
         let keys = game.board.compute_match(guess, code);
         if keys == MatchKeys::new(hole_count, 0) {
             break;
@@ -264,7 +277,10 @@ fn play_all_patterns(hole_count: u32, color_chars: &Vec<char>) {
         );
     }
     println!("Max number of guesses: {}", max_guesses);
-    println!("Average guesses: {}", total_guesses as f64 / total_patterns as f64);
+    println!(
+        "Average guesses: {}",
+        total_guesses as f64 / total_patterns as f64
+    );
 }
 
 fn main() {

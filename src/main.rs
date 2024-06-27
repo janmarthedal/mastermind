@@ -5,7 +5,7 @@ struct Board {
     hole_count: u32,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 struct MatchKeys {
     exact_count: u32,
     color_count: u32,
@@ -282,6 +282,41 @@ fn play_all_patterns(hole_count: u32, color_chars: &Vec<char>) {
         total_guesses as f64 / total_patterns as f64
     );
 }
+
+/*
+fn show_example_match(board: &Board, color_chars: &[char], p1: &str, p2: &str) {
+    println!("{}~{}: {}", p1, p2, board.compute_match(board.string_to_pattern(p1, &color_chars), board.string_to_pattern(p2, &color_chars)));
+}
+
+// use std::collections::HashSet;
+fn show_all_match_combos(board: &Board, color_chars: &[char]) {
+    // let mut match_set: HashSet<MatchKeys> = HashSet::new();
+    let pattern_count = board.total_pattern_count();
+    for pattern in 0..pattern_count {
+        for guess in 0..pattern_count {
+            let matchkeys = board.compute_match(pattern, guess);
+            // if match_set.contains(&matchkeys) {
+            //     continue;
+            // }
+            // match_set.insert(matchkeys);
+            println!(
+                "{}: {}~{}",
+                matchkeys,
+                board.pattern_to_string(pattern, color_chars),
+                board.pattern_to_string(guess, color_chars)
+            );
+        }
+    }
+}
+
+fn show_example_matches() {
+    let color_chars = vec!['1', '2', '3', '4', '5'];
+    let board = Board::new(color_chars.len() as u32, 4);
+    show_all_match_combos(&board, &color_chars);
+    // show_example_match(&board, &color_chars, "1234", "1125");
+    // show_example_match(&board, &color_chars, "1212", "1122");
+}
+*/
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();

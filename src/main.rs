@@ -170,12 +170,8 @@ impl Game {
 
     fn apply_match(&mut self, guess: u32, match_keys: MatchKeys) {
         let guess_row = &self.matches[guess as usize];
-        self.pattern_list = self
-            .pattern_list
-            .iter()
-            .filter(|&p| guess_row[*p as usize] == match_keys)
-            .copied()
-            .collect();
+        self.pattern_list
+            .retain(|&p| guess_row[p as usize] == match_keys);
     }
 }
 
@@ -189,20 +185,20 @@ fn read_match_keys() -> MatchKeys {
     MatchKeys::new(exact_count, color_count)
 }
 
-fn play_interactive(hole_count: u32, color_chars: &Vec<char>) {
+fn play_interactive(hole_count: u32, color_chars: &[char]) {
     let mut game = Game::new(color_chars.len() as u32, hole_count);
     loop {
         let (guess, possibles) = game.get_guess();
         if possibles == 1 {
             println!(
                 "Answer: {}",
-                game.board.pattern_to_string(guess, &color_chars)
+                game.board.pattern_to_string(guess, color_chars)
             );
             break;
         } else {
             println!(
                 "Guess: {} ({} possibles)",
-                game.board.pattern_to_string(guess, &color_chars),
+                game.board.pattern_to_string(guess, color_chars),
                 possibles
             );
         }
@@ -215,21 +211,21 @@ fn play_interactive(hole_count: u32, color_chars: &Vec<char>) {
     }
 }
 
-fn play_auto(hole_count: u32, color_chars: &Vec<char>, code: &str) {
+fn play_auto(hole_count: u32, color_chars: &[char], code: &str) {
     let mut game = Game::new(color_chars.len() as u32, hole_count);
-    let code = game.board.string_to_pattern(code, &color_chars);
+    let code = game.board.string_to_pattern(code, color_chars);
     loop {
         let (guess, possibles) = game.get_guess();
         if possibles == 1 {
             println!(
                 "Answer: {}",
-                game.board.pattern_to_string(guess, &color_chars)
+                game.board.pattern_to_string(guess, color_chars)
             );
             break;
         } else {
             println!(
                 "Guess: {} ({} possibles)",
-                game.board.pattern_to_string(guess, &color_chars),
+                game.board.pattern_to_string(guess, color_chars),
                 possibles
             );
         }
@@ -243,7 +239,7 @@ fn play_auto(hole_count: u32, color_chars: &Vec<char>, code: &str) {
     }
 }
 
-fn count_guesses(hole_count: u32, color_chars: &Vec<char>, code: u32) -> u32 {
+fn count_guesses(hole_count: u32, color_chars: &[char], code: u32) -> u32 {
     let mut game = Game::new(color_chars.len() as u32, hole_count);
     let mut count = 0;
     loop {
